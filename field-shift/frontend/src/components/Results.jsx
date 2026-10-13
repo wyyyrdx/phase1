@@ -65,16 +65,17 @@ export default function Results({ data }) {
         >
           <div className="card-label"><FlaskConical size={17} /> Soil snapshot</div>
           <ChevronDown className="card-chevron" size={17} />
-          <strong>{analysis.soil.texture}</strong>
-          <span>sample soil texture</span>
+          <strong>{analysis.soil?.texture}</strong>
+          <span>{analysis.soil?.cec_meq_per_100g ? `CEC ${analysis.soil.cec_meq_per_100g}` : 'soil texture'}</span>
           <div className="soil-line">
-            <div><b>{analysis.soil.ph}</b><span>pH</span></div>
-            <div><b>{analysis.soil.organic_matter_percent}%</b><span>organic matter</span></div>
+            <div><b>{analysis.soil?.ph}</b><span>pH</span></div>
+            <div><b>{analysis.soil?.organic_matter_percent}%</b><span>organic matter</span></div>
           </div>
-          <small>{analysis.soil.source}</small>
+          <small>{analysis.soil?.source}</small>
           <div className="snapshot-detail">
-            <b>How this demo value changes</b>
-            <p>This value comes from the adjustable pH and organic-matter controls. Change either control and analyze again to recalculate crop fit.</p>
+            <b>Team soil notes</b>
+            <p>{analysis.soil?.irrigation_note}</p>
+            <p>{analysis.soil?.improvement_note}</p>
           </div>
         </button>
 

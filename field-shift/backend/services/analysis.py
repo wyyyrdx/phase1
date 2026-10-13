@@ -1,6 +1,8 @@
 from mock_data.crops import CROP_PROFILES
 from mock_data.environment import climate_for, soil_for
+from mock_data.team_soil import TEAM_SOILS
 from schemas.farm import AnalysisResponse, FarmInput, RotationResponse
+from services.nasa_power import climate_from_nasa
 
 DISCLAIMER = (
     "Architecture demonstration using illustrative rules and mock data. "
@@ -43,6 +45,35 @@ def _rotation_fatigue(previous_crop: str, suggested_crops: list[dict]) -> dict:
         note = "Suggested rotation changes crop family and does not keep depleting soil nutrients."
 
     return {"type": "Rotation fatigue", "level": level, "note": note}
+
+
+def _environment(farm: FarmInput) -> tuple[dict, dict]:
+    if farm.use_nasa_climate:
+        climate = climate_from_nasa(farm.latitude, farm.longitude)
+        if climate is None:
+            climate = climate_for(farm.latitude)
+            climate["source"] = "Demo climate fallback (NASA POWER unavailable)"
+    else:
+        climate = climate_for(farm.latitude)
+        if farm.mock_temperature_c is not None:
+            climate["average_temperature_c"] = farm.mock_temperature_c
+            climate["source"] = "User-adjusted climate scenario"
+        if farm.mock_rainfall_mm is not None:
+            climate["annual_rainfall_mm"] = farm.mock_rainfall_mm
+            climate["source"] = "User-adjusted climate scenario"
+
+    soil = soil_for(farm.longitude)
+    team = TEAM_SOILS[farm.soil_type]
+    soil["texture"] = team["name"]
+    soil["cec_meq_per_100g"] = team["cec_meq_per_100g"]
+    soil["irrigation_note"] = team["irrigation"]
+    soil["improvement_note"] = team["improvement"]
+    soil["source"] = "Team soil sheet"
+    if farm.mock_soil_ph is not None:
+        soil["ph"] = farm.mock_soil_ph
+    if farm.mock_organic_matter_percent is not None:
+        soil["organic_matter_percent"] = farm.mock_organic_matter_percent
+    return climate, soil
 
 
 def _crop_scores(
@@ -107,6 +138,15 @@ def _crop_scores(
             score += 6
             reasons.append("a legume follows the previous cereal")
 
+        selected_soil = TEAM_SOILS[farm.soil_type]
+        other_crops = set().union(*(item["crops"] for item in TEAM_SOILS.values())) - selected_soil["crops"]
+        if key in selected_soil["crops"]:
+            score += 10
+            reasons.append("listed for this soil type in the team sheet")
+        elif key in other_crops:
+            score -= 8
+            reasons.append("the team sheet lists this crop for the other soil type")
+
         water_need = crop["water_need_m3_per_dunam"]
         if active_priority == "water_saving":
             if water_need <= 40:
@@ -140,20 +180,7 @@ def _crop_scores(
 
 
 def analyze_farm(farm: FarmInput) -> AnalysisResponse:
-    climate = climate_for(farm.latitude)
-    soil = soil_for(farm.longitude)
-    if farm.mock_temperature_c is not None:
-        climate["average_temperature_c"] = farm.mock_temperature_c
-        climate["source"] = "User-adjusted demo climate scenario"
-    if farm.mock_rainfall_mm is not None:
-        climate["annual_rainfall_mm"] = farm.mock_rainfall_mm
-        climate["source"] = "User-adjusted demo climate scenario"
-    if farm.mock_soil_ph is not None:
-        soil["ph"] = farm.mock_soil_ph
-        soil["source"] = "User-adjusted demo soil scenario"
-    if farm.mock_organic_matter_percent is not None:
-        soil["organic_matter_percent"] = farm.mock_organic_matter_percent
-        soil["source"] = "User-adjusted demo soil scenario"
+    climate, soil = _environment(farm)
 
     water_per_dunam = farm.available_water_m3 / farm.area_dunams
     crops = _crop_scores(farm, soil, climate)
@@ -169,7 +196,7 @@ def analyze_farm(farm: FarmInput) -> AnalysisResponse:
     heat_level = "high" if temperature > 30 else "medium" if temperature > 24 else "low"
 
     return AnalysisResponse(
-        data_label="Demo / Mock Data",
+        data_label="NASA POWER climate and team soil sheet" if climate["source"].startswith("NASA") else "Team soil sheet with demo climate",
         disclaimer=DISCLAIMER,
         request_summary=farm,
         climate=climate,
@@ -184,7 +211,7 @@ def analyze_farm(farm: FarmInput) -> AnalysisResponse:
             {
                 "type": "Heat exposure",
                 "level": heat_level,
-                "note": f"Based on the {temperature:.1f}°C adjustable scenario temperature.",
+                "note": f"Based on {temperature:.1f}°C. {climate['source']}.",
             },
             _rotation_fatigue(farm.previous_crop, crops),
         ],
@@ -244,16 +271,7 @@ def _season_rows(picks: list[dict], explanations: list[str]) -> list[dict]:
 
 
 def suggest_rotation(farm: FarmInput) -> RotationResponse:
-    climate = climate_for(farm.latitude)
-    soil = soil_for(farm.longitude)
-    if farm.mock_temperature_c is not None:
-        climate["average_temperature_c"] = farm.mock_temperature_c
-    if farm.mock_rainfall_mm is not None:
-        climate["annual_rainfall_mm"] = farm.mock_rainfall_mm
-    if farm.mock_soil_ph is not None:
-        soil["ph"] = farm.mock_soil_ph
-    if farm.mock_organic_matter_percent is not None:
-        soil["organic_matter_percent"] = farm.mock_organic_matter_percent
+    climate, soil = _environment(farm)
 
     water_per_dunam = farm.available_water_m3 / farm.area_dunams
     water_ranked = sorted(
@@ -302,7 +320,7 @@ def suggest_rotation(farm: FarmInput) -> RotationResponse:
     )
 
     return RotationResponse(
-        data_label="Demo / Mock Data",
+        data_label="NASA POWER climate and team soil sheet" if climate["source"].startswith("NASA") else "Team soil sheet with demo climate",
         disclaimer=DISCLAIMER,
         plan_name=water_plan["plan_name"],
         seasons=water_plan["seasons"],

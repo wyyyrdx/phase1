@@ -15,6 +15,8 @@ const initialFarm = {
   available_water_m3: 500,
   previous_crop: 'wheat',
   priority: 'soil_health',
+  soil_type: 'clay',
+  use_nasa_climate: true,
   mock_temperature_c: 20.8,
   mock_rainfall_mm: 420,
   mock_soil_ph: 7.1,
@@ -33,7 +35,7 @@ function Field({ label, name, value, onChange, suffix, step = 'any' }) {
   )
 }
 
-function RangeField({ label, name, value, onChange, min, max, step, suffix }) {
+function RangeField({ label, name, value, onChange, min, max, step, suffix, disabled = false }) {
   return (
     <label className="range-field">
       <span><b>{label}</b><output>{value}{suffix}</output></span>
@@ -45,6 +47,7 @@ function RangeField({ label, name, value, onChange, min, max, step, suffix }) {
         max={max}
         step={step}
         onChange={onChange}
+        disabled={disabled}
       />
       <small><span>{min}{suffix}</span><span>{max}{suffix}</span></small>
     </label>
@@ -64,8 +67,12 @@ export default function App() {
   }, [])
 
   function update(event) {
-    const { name, value } = event.target
-    const textFields = new Set(['previous_crop', 'priority'])
+    const { name, value, type, checked } = event.target
+    if (type === 'checkbox') {
+      setFarm((current) => ({ ...current, [name]: checked }))
+      return
+    }
+    const textFields = new Set(['previous_crop', 'priority', 'soil_type'])
     setFarm((current) => ({ ...current, [name]: textFields.has(name) ? value : Number(value) }))
   }
 
@@ -78,7 +85,17 @@ export default function App() {
     setError('')
     setLoading(true)
     try {
-      const data = await analyzeFarm(farm)
+      const payload = farm.use_nasa_climate
+        ? { ...farm, mock_temperature_c: null, mock_rainfall_mm: null }
+        : farm
+      const data = await analyzeFarm(payload)
+      if (farm.use_nasa_climate) {
+        setFarm((current) => ({
+          ...current,
+          mock_temperature_c: data.analysis.climate.average_temperature_c,
+          mock_rainfall_mm: data.analysis.climate.annual_rainfall_mm,
+        }))
+      }
       setResult(data)
       requestAnimationFrame(() => document.querySelector('.results')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     } catch (requestError) {
@@ -144,10 +161,16 @@ export default function App() {
                   <span><SlidersHorizontal size={14} /> Tune mock conditions</span>
                   <small>Changes the decision</small>
                 </legend>
-                <p className="scenario-help">Adjust these demo values, then click Analyze to recalculate crops, risks, and the rotation.</p>
+                <p className="scenario-help">NASA POWER supplies temperature and rainfall for the map point. pH and organic matter stay as field inputs.</p>
+                <label className="field">
+                  <span>
+                    <input name="use_nasa_climate" type="checkbox" checked={farm.use_nasa_climate} onChange={update} />
+                    {' '}Use NASA climate for this location
+                  </span>
+                </label>
                 <div className="range-grid">
-                  <RangeField label="Temperature" name="mock_temperature_c" value={farm.mock_temperature_c} onChange={update} min="5" max="40" step="0.5" suffix="°C" />
-                  <RangeField label="Annual rainfall" name="mock_rainfall_mm" value={farm.mock_rainfall_mm} onChange={update} min="50" max="1200" step="10" suffix=" mm" />
+                  <RangeField label="Temperature" name="mock_temperature_c" value={farm.mock_temperature_c} onChange={update} min="5" max="40" step="0.5" suffix="°C" disabled={farm.use_nasa_climate} />
+                  <RangeField label="Annual rainfall" name="mock_rainfall_mm" value={farm.mock_rainfall_mm} onChange={update} min="50" max="1200" step="10" suffix=" mm" disabled={farm.use_nasa_climate} />
                   <RangeField label="Soil pH" name="mock_soil_ph" value={farm.mock_soil_ph} onChange={update} min="4" max="9" step="0.1" suffix="" />
                   <RangeField label="Organic matter" name="mock_organic_matter_percent" value={farm.mock_organic_matter_percent} onChange={update} min="0.5" max="8" step="0.1" suffix="%" />
                 </div>
@@ -159,6 +182,16 @@ export default function App() {
                   <Field label="Farm area" name="area_dunams" value={farm.area_dunams} onChange={update} step="0.1" suffix="dunams" />
                   <Field label="Irrigation water" name="available_water_m3" value={farm.available_water_m3} onChange={update} step="1" suffix="m³" />
                 </div>
+                <label className="field">
+                  <span>Soil type</span>
+                  <div className="select-wrap">
+                    <select name="soil_type" value={farm.soil_type} onChange={update}>
+                      <option value="clay">Clay</option>
+                      <option value="sandy">Sandy</option>
+                    </select>
+                    <ChevronDown size={17} />
+                  </div>
+                </label>
                 <label className="field">
                   <span>Previously planted crop</span>
                   <div className="select-wrap">
