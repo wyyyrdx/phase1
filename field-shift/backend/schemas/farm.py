@@ -60,9 +60,31 @@ class RotationSeason(BaseModel):
     explanation: str
 
 
+class PlanMetrics(BaseModel):
+    average_water_m3_per_dunam: int
+    total_water_m3_per_dunam: int
+    average_suitability: int = Field(ge=0, le=100)
+    nutrient_effect: Literal["restoring", "depleting", "balanced"]
+    fits_water_allocation: bool
+
+
+class RotationPlan(BaseModel):
+    plan_name: str
+    seasons: list[RotationSeason]
+    metrics: PlanMetrics
+
+
+class PlanComparison(BaseModel):
+    lower_water_plan: str
+    water_difference_m3_per_dunam: int
+    summary: str
+
+
 class RotationResponse(BaseModel):
     data_label: str
     disclaimer: str
     plan_name: str
     seasons: list[RotationSeason]
+    plans: list[RotationPlan]
+    comparison: PlanComparison
 
