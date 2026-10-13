@@ -5,12 +5,16 @@ import MockBadge from './components/MockBadge'
 import Results from './components/Results'
 import { analyzeFarm, checkHealth } from './services/api'
 
+const apiBase = (import.meta.env.VITE_API_URL?.trim() || 'http://localhost:8000/api').replace(/\/$/, '')
+const docsUrl = `${apiBase.replace(/\/api$/, '')}/docs`
+
 const initialFarm = {
   latitude: 32.22,
   longitude: 35.26,
   area_dunams: 10,
   available_water_m3: 500,
   previous_crop: 'wheat',
+  priority: 'soil_health',
   mock_temperature_c: 20.8,
   mock_rainfall_mm: 420,
   mock_soil_ph: 7.1,
@@ -61,7 +65,8 @@ export default function App() {
 
   function update(event) {
     const { name, value } = event.target
-    setFarm((current) => ({ ...current, [name]: name === 'previous_crop' ? value : Number(value) }))
+    const textFields = new Set(['previous_crop', 'priority'])
+    setFarm((current) => ({ ...current, [name]: textFields.has(name) ? value : Number(value) }))
   }
 
   function updateLocation(location) {
@@ -93,7 +98,7 @@ export default function App() {
         <div className={`nav-links ${mobileOpen ? 'open' : ''}`}>
           <a className="active" href="#planner">Planner</a>
           <a href="#architecture">Architecture</a>
-          <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">API docs</a>
+          <a href={docsUrl} target="_blank" rel="noreferrer">API docs</a>
         </div>
         <div className={`api-status ${status}`} title="FastAPI connection status">
           <Radio size={14} /> API {status}
@@ -163,6 +168,17 @@ export default function App() {
                       <option value="tomato">Tomato</option>
                       <option value="chickpea">Chickpea</option>
                       <option value="sunflower">Sunflower</option>
+                    </select>
+                    <ChevronDown size={17} />
+                  </div>
+                </label>
+                <label className="field">
+                  <span>Farmer priority</span>
+                  <div className="select-wrap">
+                    <select name="priority" value={farm.priority} onChange={update}>
+                      <option value="water_saving">Water Saving</option>
+                      <option value="soil_health">Soil Health</option>
+                      <option value="high_yield">High Yield</option>
                     </select>
                     <ChevronDown size={17} />
                   </div>

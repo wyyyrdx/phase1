@@ -81,7 +81,7 @@ export default function Results({ data }) {
         <article className="insight-card risk-card">
           <div className="card-label"><TriangleAlert size={17} /> Risk signals</div>
           <div className="risk-list">
-            {analysis.risks.map((risk, index) => (
+            {analysis.risks?.map((risk, index) => (
               <button
                 type="button"
                 key={risk.type}
@@ -97,7 +97,7 @@ export default function Results({ data }) {
           </div>
           <div className="risk-explanation" aria-live="polite">
             <Info size={14} />
-            <p><b>{analysis.risks[selectedRisk].type}</b>{analysis.risks[selectedRisk].note}</p>
+            <p><b>{analysis.risks?.[selectedRisk]?.type}</b>{analysis.risks?.[selectedRisk]?.note}</p>
           </div>
         </article>
       </div>
@@ -107,7 +107,7 @@ export default function Results({ data }) {
         <span>Rule-based score / 100</span>
       </div>
       <div className="crop-list">
-        {analysis.suggested_crops.map((crop, index) => (
+        {analysis.suggested_crops?.map((crop, index) => (
           <button
             type="button"
             className={`crop-row ${selectedCrop === index ? 'is-selected' : ''}`}
@@ -129,25 +129,45 @@ export default function Results({ data }) {
       </div>
       <div className="crop-selection" aria-live="polite">
         <Leaf size={14} />
-        <p><b>{analysis.suggested_crops[selectedCrop].crop} selected.</b> Its demo score combines water availability, soil pH, and whether it repeats the previous crop.</p>
+        <p><b>{analysis.suggested_crops?.[selectedCrop]?.crop} selected.</b> Its demo score combines water availability, soil pH, and whether it repeats the previous crop.</p>
       </div>
 
-      <div className="section-title rotation-title">
-        <div><p className="eyebrow">Rotation plan</p><h3>{rotation.plan_name}</h3></div>
-        <MockBadge compact />
-      </div>
-      <div className="timeline">
-        {rotation.seasons.map((season) => (
-          <article className="season" key={season.season}>
-            <div className="season-number">{season.season}</div>
-            <div className="season-copy">
-              <span>{season.period}</span>
-              <h4>{season.crop}</h4>
-              <p>{season.explanation}</p>
+      {(rotation?.plans?.length ? rotation.plans : [{ plan_name: rotation?.plan_name, seasons: rotation?.seasons }]).map((plan) => (
+        <div key={plan.plan_name}>
+          <div className="section-title rotation-title">
+            <div><p className="eyebrow">Rotation plan</p><h3>{plan.plan_name}</h3></div>
+            <MockBadge compact />
+          </div>
+          {plan.metrics && (
+            <div className="crop-selection">
+              <Info size={14} />
+              <p>
+                <b>{plan.metrics.average_water_m3_per_dunam} m³/dunam average water.</b>
+                {' '}Suitability {plan.metrics.average_suitability}/100 · {plan.metrics.nutrient_effect} nutrients
+                {plan.metrics.fits_water_allocation ? ' · fits the water allocation' : ' · above the water allocation'}.
+              </p>
             </div>
-          </article>
-        ))}
-      </div>
+          )}
+          <div className="timeline">
+            {plan.seasons?.map((season) => (
+              <article className="season" key={`${plan.plan_name}-${season.season}`}>
+                <div className="season-number">{season.season}</div>
+                <div className="season-copy">
+                  <span>{season.period}</span>
+                  <h4>{season.crop}</h4>
+                  <p>{season.explanation}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      ))}
+      {rotation?.comparison?.summary && (
+        <div className="crop-selection">
+          <Info size={14} />
+          <p><b>Plan comparison.</b> {rotation.comparison.summary}</p>
+        </div>
+      )}
 
       <div className="disclaimer"><Info size={16} /><p>{analysis.disclaimer}</p></div>
     </section>
