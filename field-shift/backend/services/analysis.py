@@ -6,6 +6,43 @@ DISCLAIMER = (
     "Architecture demonstration using illustrative rules and mock data. "
     "Scores are not scientifically validated forecasts or farming advice."
 )
+DEPLETING_FAMILIES = {"cereal"}
+
+
+def _family_of(crop_name: str) -> str:
+    key = crop_name.strip().lower()
+    profile = CROP_PROFILES.get(key)
+    if profile is None:
+        profile = next(
+            (item for item in CROP_PROFILES.values() if item["name"].lower() == key),
+            None,
+        )
+    return profile["family"].lower() if profile else ""
+
+
+def _rotation_fatigue(previous_crop: str, suggested_crops: list[dict]) -> dict:
+    families = [_family_of(previous_crop)]
+    families.extend(_family_of(item["crop"]) for item in suggested_crops)
+    repeats_family = any(
+        current and current == previous for previous, current in zip(families, families[1:])
+    )
+    depletes_nutrients = sum(family in DEPLETING_FAMILIES for family in families) >= 2
+    restores_nutrients = any(family == "legume" for family in families[1:])
+
+    if repeats_family and depletes_nutrients and not restores_nutrients:
+        level = "high"
+        note = "Suggested rotation repeats a crop family and keeps depleting soil nutrients."
+    elif repeats_family:
+        level = "medium"
+        note = "Suggested rotation repeats the same crop family as the crop before it."
+    elif depletes_nutrients and not restores_nutrients:
+        level = "medium"
+        note = "Suggested rotation is mostly nutrient-depleting crops and includes no legume."
+    else:
+        level = "low"
+        note = "Suggested rotation changes crop family and does not keep depleting soil nutrients."
+
+    return {"type": "Rotation fatigue", "level": level, "note": note}
 
 
 def _crop_scores(farm: FarmInput, soil: dict, climate: dict) -> list[dict]:
@@ -49,12 +86,38 @@ def _crop_scores(farm: FarmInput, soil: dict, climate: dict) -> list[dict]:
         if soil["organic_matter_percent"] >= 2:
             score += 4
 
+        previous_crop = CROP_PROFILES.get(previous)
+        previous_family = previous_crop["family"].lower() if previous_crop else ""
+        family = crop["family"].lower()
+
         if key == previous:
             score -= 25
             reasons.append("penalized to avoid repeating the previous crop")
-        elif crop["family"].lower() == "legume" and previous in {"wheat", "barley"}:
+        elif previous_family and family == previous_family:
+            score -= 18
+            reasons.append("penalized because it repeats the previous crop family")
+        elif family == "legume" and previous_family == "cereal":
             score += 6
             reasons.append("a legume follows the previous cereal")
+
+        water_need = crop["water_need_m3_per_dunam"]
+        if farm.priority == "water_saving":
+            if water_need <= 40:
+                score += 10
+                reasons.append("favored for the water-saving priority")
+            elif water_need >= 55:
+                score -= 10
+                reasons.append("penalized for the water-saving priority")
+        elif farm.priority == "soil_health":
+            if family == "legume":
+                score += 10
+                reasons.append("favored for the soil-health priority")
+            elif family in DEPLETING_FAMILIES:
+                score -= 8
+                reasons.append("penalized for the soil-health priority")
+        elif farm.priority == "high_yield" and water_need >= 55:
+            score += 12
+            reasons.append("favored for the high-yield priority")
 
         scores.append(
             {
@@ -115,11 +178,7 @@ def analyze_farm(farm: FarmInput) -> AnalysisResponse:
                 "level": heat_level,
                 "note": f"Based on the {temperature:.1f}°C adjustable scenario temperature.",
             },
-            {
-                "type": "Rotation fatigue",
-                "level": "medium" if farm.previous_crop.lower() in {"wheat", "barley"} else "low",
-                "note": "A simple crop-family repeat check; no field history is stored.",
-            },
+            _rotation_fatigue(farm.previous_crop, crops),
         ],
     )
 

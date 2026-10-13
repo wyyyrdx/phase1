@@ -9,6 +9,7 @@ class FarmInput(BaseModel):
     area_dunams: float = Field(gt=0, le=100_000)
     available_water_m3: float = Field(ge=0, le=100_000_000)
     previous_crop: str = Field(min_length=2, max_length=50)
+    priority: Literal["water_saving", "soil_health", "high_yield"] = "soil_health"
     mock_temperature_c: Optional[float] = Field(default=None, ge=-10, le=50)
     mock_rainfall_mm: Optional[int] = Field(default=None, ge=0, le=3000)
     mock_soil_ph: Optional[float] = Field(default=None, ge=3, le=10)

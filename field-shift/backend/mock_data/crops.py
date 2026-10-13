@@ -40,4 +40,3 @@ CROP_PROFILES = {
         "benefit": "Reliable cool-season cereal",
     },
 }
-
