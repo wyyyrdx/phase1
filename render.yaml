@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: field-shift-api
+    runtime: python
+    plan: free
+    rootDir: field-shift/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: FIELD_SHIFT_CORS_ORIGINS
+        sync: false
