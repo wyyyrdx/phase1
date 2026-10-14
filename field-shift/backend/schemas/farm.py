@@ -10,7 +10,7 @@ class FarmInput(BaseModel):
     available_water_m3: float = Field(ge=0, le=100_000_000)
     previous_crop: str = Field(min_length=2, max_length=50)
     priority: Literal["water_saving", "soil_health", "high_yield"] = "soil_health"
-    soil_type: Literal["sandy", "clay"] = "clay"
+    soil_type: Literal["sandy", "loam", "silt", "clay", "peat"] = "clay"
     use_nasa_climate: bool = True
     mock_temperature_c: Optional[float] = Field(default=None, ge=-10, le=50)
     mock_rainfall_mm: Optional[int] = Field(default=None, ge=0, le=3000)
@@ -33,6 +33,9 @@ class SoilData(BaseModel):
     cec_meq_per_100g: str = ""
     irrigation_note: str = ""
     improvement_note: str = ""
+    example_crops: str = ""
+    ph_min: Optional[float] = None
+    ph_max: Optional[float] = None
 
 
 class Risk(BaseModel):
@@ -46,6 +49,7 @@ class CropSuggestion(BaseModel):
     score: int = Field(ge=0, le=100)
     reason: str
     water_need_m3_per_dunam: int
+    season: Literal["winter", "summer"]
 
 
 class AnalysisResponse(BaseModel):

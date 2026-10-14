@@ -52,8 +52,8 @@ export default function Results({ data }) {
           </div>
           <small>{analysis.climate.source}</small>
           <div className="snapshot-detail">
-            <b>How this demo value changes</b>
-            <p>This value comes from the adjustable temperature and rainfall controls. Change either control and analyze again to recalculate crop fit and risks.</p>
+            <b>How this value was chosen</b>
+            <p>{analysis.climate.source}. Soil pH and organic matter still come from the field inputs.</p>
           </div>
         </button>
 
@@ -73,8 +73,9 @@ export default function Results({ data }) {
           </div>
           <small>{analysis.soil?.source}</small>
           <div className="snapshot-detail">
-            <b>Team soil notes</b>
-            <p>{analysis.soil?.irrigation_note}</p>
+            <b>From the team soil dataset</b>
+            <p>{analysis.soil?.example_crops ? `Suitable crops: ${analysis.soil.example_crops}` : ''}</p>
+            <p>{analysis.soil?.ph_min != null ? `Sheet pH range: ${analysis.soil.ph_min}–${analysis.soil.ph_max}. ` : ''}{analysis.soil?.irrigation_note}</p>
             <p>{analysis.soil?.improvement_note}</p>
           </div>
         </button>
@@ -119,7 +120,7 @@ export default function Results({ data }) {
             <div className="crop-rank">0{index + 1}</div>
             <div className="crop-icon"><Leaf size={19} /></div>
             <div className="crop-copy">
-              <div><h4>{crop.crop}</h4><span>{crop.water_need_m3_per_dunam} m³/dunam</span></div>
+              <div><h4>{crop.crop}</h4><span>{crop.season} · {crop.water_need_m3_per_dunam} m³/dunam</span></div>
               <p>{crop.reason}</p>
             </div>
             <div className="score" style={{ '--score': `${crop.score}%` }}>
@@ -130,7 +131,7 @@ export default function Results({ data }) {
       </div>
       <div className="crop-selection" aria-live="polite">
         <Leaf size={14} />
-        <p><b>{analysis.suggested_crops?.[selectedCrop]?.crop} selected.</b> Its demo score combines water availability, soil pH, and whether it repeats the previous crop.</p>
+        <p><b>{analysis.suggested_crops?.[selectedCrop]?.crop} selected.</b> Its demo score uses the mock crop profile: water, pH, temperature, and whether it repeats the previous crop. Winter periods only take winter crops, and the summer period only takes a summer crop.</p>
       </div>
 
       {(rotation?.plans?.length ? rotation.plans : [{ plan_name: rotation?.plan_name, seasons: rotation?.seasons }]).map((plan) => (

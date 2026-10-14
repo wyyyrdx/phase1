@@ -5,6 +5,7 @@ CROP_PROFILES = {
         "water_need_m3_per_dunam": 32,
         "preferred_ph": [6.0, 8.0],
         "preferred_temperature_c": [15, 28],
+        "season": "winter",
         "benefit": "Adds nitrogen and breaks cereal disease cycles",
     },
     "barley": {
@@ -13,6 +14,7 @@ CROP_PROFILES = {
         "water_need_m3_per_dunam": 38,
         "preferred_ph": [6.0, 8.5],
         "preferred_temperature_c": [10, 24],
+        "season": "winter",
         "benefit": "Tolerates dry conditions and establishes quickly",
     },
     "tomato": {
@@ -21,6 +23,7 @@ CROP_PROFILES = {
         "water_need_m3_per_dunam": 62,
         "preferred_ph": [5.8, 7.2],
         "preferred_temperature_c": [18, 32],
+        "season": "summer",
         "benefit": "Higher-value summer crop where water is sufficient",
     },
     "sunflower": {
@@ -29,6 +32,7 @@ CROP_PROFILES = {
         "water_need_m3_per_dunam": 45,
         "preferred_ph": [6.0, 7.8],
         "preferred_temperature_c": [18, 30],
+        "season": "summer",
         "benefit": "Deep rooting can improve soil structure",
     },
     "wheat": {
@@ -37,6 +41,7 @@ CROP_PROFILES = {
         "water_need_m3_per_dunam": 42,
         "preferred_ph": [6.0, 7.5],
         "preferred_temperature_c": [10, 25],
+        "season": "winter",
         "benefit": "Reliable cool-season cereal",
     },
 }

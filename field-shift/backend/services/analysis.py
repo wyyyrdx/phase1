@@ -68,7 +68,10 @@ def _environment(farm: FarmInput) -> tuple[dict, dict]:
     soil["cec_meq_per_100g"] = team["cec_meq_per_100g"]
     soil["irrigation_note"] = team["irrigation"]
     soil["improvement_note"] = team["improvement"]
-    soil["source"] = "Team soil sheet"
+    soil["example_crops"] = team["example_crops"]
+    soil["ph_min"] = team["ph_min"]
+    soil["ph_max"] = team["ph_max"]
+    soil["source"] = "Team soil dataset"
     if farm.mock_soil_ph is not None:
         soil["ph"] = farm.mock_soil_ph
     if farm.mock_organic_matter_percent is not None:
@@ -138,15 +141,6 @@ def _crop_scores(
             score += 6
             reasons.append("a legume follows the previous cereal")
 
-        selected_soil = TEAM_SOILS[farm.soil_type]
-        other_crops = set().union(*(item["crops"] for item in TEAM_SOILS.values())) - selected_soil["crops"]
-        if key in selected_soil["crops"]:
-            score += 10
-            reasons.append("listed for this soil type in the team sheet")
-        elif key in other_crops:
-            score -= 8
-            reasons.append("the team sheet lists this crop for the other soil type")
-
         water_need = crop["water_need_m3_per_dunam"]
         if active_priority == "water_saving":
             if water_need <= 40:
@@ -172,6 +166,7 @@ def _crop_scores(
                 "score": max(0, min(100, score)),
                 "reason": "; ".join(reasons).capitalize() + ".",
                 "water_need_m3_per_dunam": crop["water_need_m3_per_dunam"],
+                "season": crop["season"],
             }
         )
 
@@ -196,7 +191,7 @@ def analyze_farm(farm: FarmInput) -> AnalysisResponse:
     heat_level = "high" if temperature > 30 else "medium" if temperature > 24 else "low"
 
     return AnalysisResponse(
-        data_label="NASA POWER climate and team soil sheet" if climate["source"].startswith("NASA") else "Team soil sheet with demo climate",
+        data_label=_data_label(climate),
         disclaimer=DISCLAIMER,
         request_summary=farm,
         climate=climate,
@@ -239,35 +234,45 @@ def _plan_metrics(picks: list[dict], water_per_dunam: float) -> dict:
     }
 
 
-def _take_crops(ranked: list[dict], count: int = 3, blocked: set[str] | None = None) -> list[dict]:
-    skipped = blocked or set()
-    chosen = []
-    for item in ranked:
-        if item["crop"] in skipped or item["crop"] in {pick["crop"] for pick in chosen}:
-            continue
-        chosen.append(item)
-        if len(chosen) == count:
-            return chosen
-    for item in ranked:
-        if item["crop"] in {pick["crop"] for pick in chosen}:
-            continue
-        chosen.append(item)
-        if len(chosen) == count:
-            break
-    return chosen
+PERIODS = [
+    ("Winter 2026", "winter"),
+    ("Summer 2027", "summer"),
+    ("Winter 2027", "winter"),
+]
 
 
-def _season_rows(picks: list[dict], explanations: list[str]) -> list[dict]:
-    periods = ["Winter 2026", "Summer 2027", "Winter 2027"]
-    return [
-        {
-            "season": index + 1,
-            "period": periods[index],
-            "crop": pick["crop"],
-            "explanation": explanations[index],
-        }
-        for index, pick in enumerate(picks)
-    ]
+def _data_label(climate: dict) -> str:
+    if climate["source"].startswith("NASA"):
+        return "Demo crop rules with NASA POWER climate"
+    return "Demo crop rules with demo climate"
+
+
+def _pick_for_season(ranked: list[dict], season: str, used: set[str]) -> dict:
+    for item in ranked:
+        if item["crop"] not in used and item["season"] == season:
+            return item
+    for item in ranked:
+        if item["crop"] not in used:
+            return item
+    return ranked[0]
+
+
+def _season_plan(ranked: list[dict], explanations: list[str], blocked: set[str] | None = None) -> list[dict]:
+    used = set(blocked or [])
+    rows = []
+    for index, (period, season) in enumerate(PERIODS):
+        pick = _pick_for_season(ranked, season, used)
+        used.add(pick["crop"])
+        rows.append(
+            {
+                "season": index + 1,
+                "period": period,
+                "crop": pick["crop"],
+                "explanation": explanations[index].format(season=season, crop=pick["crop"]),
+                "_pick": pick,
+            }
+        )
+    return rows
 
 
 def suggest_rotation(farm: FarmInput) -> RotationResponse:
@@ -279,33 +284,43 @@ def suggest_rotation(farm: FarmInput) -> RotationResponse:
         key=lambda item: (item["water_need_m3_per_dunam"], -item["score"]),
     )
     soil_ranked = _crop_scores(farm, soil, climate, priority="soil_health", limit=None)
-    water_picks = _take_crops(water_ranked)
-    soil_picks = _take_crops(soil_ranked)
-    if [item["crop"] for item in water_picks] == [item["crop"] for item in soil_picks]:
-        soil_picks = _take_crops(soil_ranked, blocked={water_picks[-1]["crop"]})
+    water_rows = _season_plan(
+        water_ranked,
+        [
+            f"Lowest-water {{season}} crop after the previous {farm.previous_crop} crop.",
+            "Lowest-water {season} crop still unused.",
+            "Lowest-water {season} crop for the last season.",
+        ],
+    )
+    soil_rows = _season_plan(
+        soil_ranked,
+        [
+            "Best soil-health {season} crop after the previous crop, preferring a legume when it fits.",
+            "A different {season} crop keeps the rotation from drawing down the same nutrients.",
+            "Remaining {season} option for the last season.",
+        ],
+    )
+    if [row["crop"] for row in water_rows] == [row["crop"] for row in soil_rows]:
+        soil_rows = _season_plan(
+            soil_ranked,
+            [
+                "Best soil-health {season} crop after the previous crop, preferring a legume when it fits.",
+                "A different {season} crop keeps the rotation from drawing down the same nutrients.",
+                "Remaining {season} option for the last season.",
+            ],
+            blocked={water_rows[-1]["crop"]},
+        )
+    water_picks = [row.pop("_pick") for row in water_rows]
+    soil_picks = [row.pop("_pick") for row in soil_rows]
 
     water_plan = {
         "plan_name": "Plan A: Water-saving",
-        "seasons": _season_rows(
-            water_picks,
-            [
-                f"Lowest-water fit after the previous {farm.previous_crop} crop.",
-                "Next lowest-water crop for the following season.",
-                "Third low-water crop completes the water-saving sequence.",
-            ],
-        ),
+        "seasons": water_rows,
         "metrics": _plan_metrics(water_picks, water_per_dunam),
     }
     soil_plan = {
         "plan_name": "Plan B: Soil-restoring",
-        "seasons": _season_rows(
-            soil_picks,
-            [
-                "Chosen to restore soil after the previous crop, preferring a legume when it fits.",
-                "A different family keeps the rotation from drawing down the same nutrients.",
-                "Remaining balanced option for the last season.",
-            ],
-        ),
+        "seasons": soil_rows,
         "metrics": _plan_metrics(soil_picks, water_per_dunam),
     }
     water_gap = abs(
@@ -320,7 +335,7 @@ def suggest_rotation(farm: FarmInput) -> RotationResponse:
     )
 
     return RotationResponse(
-        data_label="NASA POWER climate and team soil sheet" if climate["source"].startswith("NASA") else "Team soil sheet with demo climate",
+        data_label=_data_label(climate),
         disclaimer=DISCLAIMER,
         plan_name=water_plan["plan_name"],
         seasons=water_plan["seasons"],

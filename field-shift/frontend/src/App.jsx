@@ -186,8 +186,11 @@ export default function App() {
                   <span>Soil type</span>
                   <div className="select-wrap">
                     <select name="soil_type" value={farm.soil_type} onChange={update}>
-                      <option value="clay">Clay</option>
                       <option value="sandy">Sandy</option>
+                      <option value="loam">Loam</option>
+                      <option value="silt">Silt</option>
+                      <option value="clay">Clay</option>
+                      <option value="peat">Peat</option>
                     </select>
                     <ChevronDown size={17} />
                   </div>
